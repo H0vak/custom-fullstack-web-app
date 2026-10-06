@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="uk" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskFlow — Канбан Дошка</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#f0f9ff', 100: '#e0f2fe', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1' }
+                    },
+                    animation: { 'blob': 'blob 10s infinite' },
+                    keyframes: {
+                        blob: {
+                            '0%, 100%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.4); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(156, 163, 175, 0.7); }
+    </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen transition-colors duration-300 relative overflow-x-hidden">
+
+<!-- Анімований фон Mesh Gradient -->
+<div class="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-40 dark:opacity-30">
+    <div class="absolute top-10 left-10 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob"></div>
+    <div class="absolute top-1/3 right-10 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob [animation-delay:2s]"></div>
+    <div class="absolute -bottom-10 left-1/3 w-96 h-96 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob [animation-delay:4s]"></div>
+</div>
+
+<!-- Основний контент -->
+<div class="relative z-10 flex flex-col min-h-screen p-4 md:p-6 max-w-[1600px] mx-auto">
+
+    <!-- Шапка -->
+    <header class="bg-white/70 dark:bg-slate-900/70 backdrop-blur-md border border-white/20 dark:border-slate-800/80 rounded-2xl p-4 md:p-5 mb-6 shadow-xl flex flex-col md:flex-row justify-between items-center gap-4 transition-all">
+        <div class="flex items-center gap-3">
+            <div class="w-11 h-11 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+                <i class="fas fa-layer-group text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-black tracking-tight bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600 bg-clip-text text-transparent">TaskFlow</h1>
+                <p class="text-xs text-slate-500 dark:text-slate-400 font-medium" id="lang-subtitle">Канбан-дошка нового покоління</p>
+            </div>
+        </div>
+
+        <!-- Фільтри -->
+        <div class="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">
+            <div class="relative flex-1 md:w-64">
+                <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input type="text" id="search-input" placeholder="Пошук завдань..."
+                       class="w-full pl-10 pr-4 py-2 bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+            </div>
+
+            <select id="filter-category" class="py-2 px-3 bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer">
+                <option value="all" id="lang-cat-all">Усі категорії</option>
+                <option value="study" id="lang-cat-study">Навчання</option>
+                <option value="work" id="lang-cat-work">Робота</option>
+                <option value="personal" id="lang-cat-personal">Особисте</option>
+                <option value="project" id="lang-cat-project">Проєкт</option>
+            </select>
+
+            <select id="filter-priority" class="py-2 px-3 bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer">
+                <option value="all" id="lang-prio-all">Усі пріоритети</option>
+                <option value="high" id="lang-prio-high">Високий</option>
+                <option value="medium" id="lang-prio-medium">Середній</option>
+                <option value="low" id="lang-prio-low">Низький</option>
+            </select>
+        </div>
+
+        <!-- Кнопки управління -->
+        <div class="flex items-center gap-3 w-full md:w-auto justify-end">
+            <button id="btn-add-task" type="button" onclick="openTaskModal()" class="flex-1 md:flex-none px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-sm font-semibold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition active:scale-95 flex items-center justify-center gap-2">
+                <i class="fas fa-plus"></i>
+                <span id="lang-btn-create">Створити</span>
+            </button>
+
+            <button id="btn-lang" type="button" class="px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition flex items-center justify-center min-w-[75px]">
+                <span id="lang-btn-text"><span class="font-black text-blue-500">UA</span> | <span class="font-normal opacity-60">ENG</span></span>
+            </button>
+
+            <button id="btn-theme" type="button" class="p-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+                <i class="fas fa-moon dark:hidden"></i>
+                <i class="fas fa-sun hidden dark:block text-amber-400"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Статистика -->
+    <section class="bg-white/50 dark:bg-slate-900/50 backdrop-blur-md border border-white/20 dark:border-slate-800/60 rounded-2xl p-4 mb-6 shadow-sm">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full md:w-auto flex-1">
+                <div class="bg-white/80 dark:bg-slate-800/80 p-3 rounded-xl border border-slate-100 dark:border-slate-700/50 flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-sm"><i class="fas fa-list-check"></i></div>
+                    <div><div class="text-xs text-slate-500 dark:text-slate-400" id="lang-stat-total">Всього</div><div class="text-lg font-bold" id="stat-total">0</div></div>
+                </div>
+                <div class="bg-white/80 dark:bg-slate-800/80 p-3 rounded-xl border border-slate-100 dark:border-slate-700/50 flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-sm"><i class="fas fa-spinner"></i></div>
+                    <div><div class="text-xs text-slate-500 dark:text-slate-400" id="lang-stat-in-progress">В процесі</div><div class="text-lg font-bold" id="stat-in-progress">0</div></div>
+                </div>
+                <div class="bg-white/80 dark:bg-slate-800/80 p-3 rounded-xl border border-slate-100 dark:border-slate-700/50 flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-sm"><i class="fas fa-circle-check"></i></div>
+                    <div><div class="text-xs text-slate-500 dark:text-slate-400" id="lang-stat-done">Виконано</div><div class="text-lg font-bold" id="stat-done">0</div></div>
+                </div>
+                <div class="bg-white/80 dark:bg-slate-800/80 p-3 rounded-xl border border-slate-100 dark:border-slate-700/50 flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-sm"><i class="fas fa-chart-line"></i></div>
+                    <div><div class="text-xs text-slate-500 dark:text-slate-400" id="lang-stat-progress">Прогрес</div><div class="text-lg font-bold" id="stat-progress">0%</div></div>
+                </div>
+            </div>
+
+            <div class="w-full md:w-64 bg-slate-200 dark:bg-slate-800 h-3 rounded-full overflow-hidden p-0.5 border border-slate-300/50 dark:border-slate-700/50">
+                <div id="progress-bar-fill" class="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-500 rounded-full transition-all duration-500 w-0"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Колонки Канбан -->
+    <main class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 flex-1 items-start">
+        <div class="kanban-column bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-white/20 dark:border-slate-800/60 rounded-2xl p-4 flex flex-col min-h-[500px] shadow-sm" data-status="todo">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-200/60 dark:border-slate-800">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-slate-400"></span>
+                    <h2 class="font-bold text-sm tracking-wide uppercase text-slate-700 dark:text-slate-300" id="lang-col-todo">До виконання</h2>
+                </div>
+                <span id="count-todo" class="px-2.5 py-0.5 text-xs font-bold bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-full">0</span>
+            </div>
+            <div class="task-list flex-1 flex flex-col gap-3" id="col-todo"></div>
+        </div>
+
+        <div class="kanban-column bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-white/20 dark:border-slate-800/60 rounded-2xl p-4 flex flex-col min-h-[500px] shadow-sm" data-status="in-progress">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-200/60 dark:border-slate-800">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+                    <h2 class="font-bold text-sm tracking-wide uppercase text-slate-700 dark:text-slate-300" id="lang-col-in-progress">В процесі</h2>
+                </div>
+                <span id="count-in-progress" class="px-2.5 py-0.5 text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 rounded-full">0</span>
+            </div>
+            <div class="task-list flex-1 flex flex-col gap-3" id="col-in-progress"></div>
+        </div>
+
+        <div class="kanban-column bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-white/20 dark:border-slate-800/60 rounded-2xl p-4 flex flex-col min-h-[500px] shadow-sm" data-status="review">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-200/60 dark:border-slate-800">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-purple-500"></span>
+                    <h2 class="font-bold text-sm tracking-wide uppercase text-slate-700 dark:text-slate-300" id="lang-col-review">На перевірці</h2>
+                </div>
+                <span id="count-review" class="px-2.5 py-0.5 text-xs font-bold bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 rounded-full">0</span>
+            </div>
+            <div class="task-list flex-1 flex flex-col gap-3" id="col-review"></div>
+        </div>
+
+        <div class="kanban-column bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-white/20 dark:border-slate-800/60 rounded-2xl p-4 flex flex-col min-h-[500px] shadow-sm" data-status="done">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-200/60 dark:border-slate-800">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                    <h2 class="font-bold text-sm tracking-wide uppercase text-slate-700 dark:text-slate-300" id="lang-col-done">Готово</h2>
+                </div>
+                <span id="count-done" class="px-2.5 py-0.5 text-xs font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-full">0</span>
+            </div>
+            <div class="task-list flex-1 flex flex-col gap-3" id="col-done"></div>
+        </div>
+    </main>
+</div>
+
+<!-- МОДАЛЬНЕ ВІКНО СТВОРЕННЯ / РЕДАГУВАННЯ -->
+<div id="task-modal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg p-6 shadow-2xl transform scale-95 transition-all duration-300 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-5 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <h3 id="modal-title" class="text-xl font-bold">Створити завдання</h3>
+            <button type="button" onclick="closeTaskModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl transition">
+                <i class="fas fa-xmark"></i>
+            </button>
+        </div>
+
+        <form id="task-form" onsubmit="event.preventDefault(); saveTaskFromModal();" class="space-y-4">
+            <input type="hidden" id="task-id">
+
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1" id="lang-form-title">Назва завдання *</label>
+                <input type="text" id="task-title-input" placeholder="Введіть назву..."
+                       class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+                <p id="title-error-msg" class="text-xs text-red-500 mt-1 hidden font-medium">Будь ласка, введіть назву завдання!</p>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1" id="lang-form-desc">Опис</label>
+                <textarea id="task-desc-input" rows="3" placeholder="Додайте детальний опис..."
+                          class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition resize-none"></textarea>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1" id="lang-form-image">Прикріпити зображення</label>
+                <input type="file" id="task-image-input" accept="image/*" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-slate-800 dark:file:text-slate-300 transition cursor-pointer">
+                <div id="image-preview-container" class="mt-2 hidden relative group w-fit">
+                    <img id="image-preview" src="" alt="Preview" class="h-20 w-auto rounded-lg object-cover border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <button type="button" onclick="removeSelectedImage()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs shadow hover:bg-red-600 transition">
+                        <i class="fas fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1" id="lang-form-cat">Категорія</label>
+                    <select id="task-category-input" class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer">
+                        <option value="study" id="lang-opt-study">Навчання</option>
+                        <option value="work" id="lang-opt-work">Робота</option>
+                        <option value="personal" id="lang-opt-personal">Особисте</option>
+                        <option value="project" id="lang-opt-project">Проєкт</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1" id="lang-form-prio">Пріоритет</label>
+                    <select id="task-priority-input" class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer">
+                        <option value="low" id="lang-opt-low">Низький</option>
+                        <option value="medium" selected id="lang-opt-medium">Середній</option>
+                        <option value="high" id="lang-opt-high">Високий</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1" id="lang-form-date">Дедлайн</label>
+                <input type="date" id="task-date-input" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer">
+            </div>
+
+            <div class="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button type="button" onclick="closeTaskModal()" class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                    <span id="lang-btn-cancel">Скасувати</span>
+                </button>
+                <button type="button" onclick="saveTaskFromModal()" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-lg shadow-blue-500/25 transition active:scale-95">
+                    <span id="lang-btn-save">Зберегти</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- МОДАЛЬНЕ ВІКНО ПЕРЕГЛЯДУ ("ОКО") ІЗ ФУНКЦІЄЮ "НА ВЕСЬ ЕКРАН" -->
+<div id="view-modal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
+    <div id="view-modal-content" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-2xl p-6 md:p-8 shadow-2xl transform scale-95 transition-all duration-300 max-h-[90vh] overflow-y-auto flex flex-col gap-5">
+        <div class="flex justify-between items-start gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+            <div>
+                <div class="flex flex-wrap items-center gap-2 mb-2" id="view-badges"></div>
+                <h2 id="view-title" class="text-2xl font-bold leading-tight">...</h2>
+            </div>
+            <button type="button" onclick="closeViewModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-2xl transition p-1">
+                <i class="fas fa-xmark"></i>
+            </button>
+        </div>
+
+        <div id="view-image-container" class="hidden rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 max-h-80 bg-slate-100 dark:bg-slate-950 flex items-center justify-center">
+            <img id="view-image" src="" alt="Attachment" class="w-full h-full object-contain">
+        </div>
+
+        <div class="flex flex-col flex-1">
+            <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2" id="lang-view-desc-heading">Опис завдання</h4>
+            <!-- ВИПРАВЛЕНО БАГ З ТЕКСТОМ: додано break-words break-all whitespace-pre-wrap -->
+            <div id="view-desc" class="text-sm md:text-base leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words break-all bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 max-h-80 overflow-y-auto transition-all duration-300">...</div>
+        </div>
+
+        <div class="flex justify-between items-center pt-4 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-400">
+            <span id="view-date"></span>
+
+            <!-- Панель кнопок зправа внизу -->
+            <div class="flex items-center gap-3">
+                <!-- Кнопка Розгортання на весь екран -->
+                <button type="button" onclick="toggleViewFullscreen()" class="px-4 py-2.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-600 dark:text-blue-400 rounded-xl font-semibold transition flex items-center gap-2">
+                    <i id="fullscreen-icon" class="fas fa-expand"></i>
+                    <span id="lang-fullscreen-btn">На весь екран</span>
+                </button>
+
+                <button type="button" onclick="closeViewModal()" class="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-semibold transition">
+                    <span id="lang-view-close">Закрити</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- МОДАЛЬНЕ ВІКНО ВИДАЛЕННЯ -->
+<div id="confirm-modal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md p-6 shadow-2xl transform scale-95 transition-all duration-300 text-center">
+        <div class="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-950/50 text-red-500 flex items-center justify-center mx-auto mb-4 text-xl">
+            <i class="fas fa-triangle-exclamation"></i>
+        </div>
+        <h3 class="text-lg font-bold mb-2" id="lang-confirm-title">Видалення завдання</h3>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mb-6" id="lang-confirm-msg">Ви впевнені, що хочете видалити це завдання?</p>
+        <div class="flex gap-3 justify-center">
+            <button type="button" onclick="closeConfirmModal()" class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                <span id="lang-confirm-cancel">Скасувати</span>
+            </button>
+            <button type="button" onclick="executeDeleteTask()" class="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold shadow-lg shadow-red-500/25 transition">
+                <span id="lang-confirm-delete">Видалити</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- JS СКРИПТ -->
+<script>
+    const columnOrder = ['todo', 'in-progress', 'review', 'done'];
+
+    let tasks = [];
+    try {
+        const raw = localStorage.getItem('taskflow_tasks');
+        if (raw) tasks = JSON.parse(raw);
+        if (!Array.isArray(tasks)) tasks = [];
+    } catch (e) {
+        tasks = [];
+    }
+
+    tasks = tasks
+        .filter(t => t && typeof t === 'object')
+        .map(t => ({
+            id: String(t.id || Date.now() + Math.random()),
+            title: String(t.title || '').trim(),
+            description: String(t.description || '').trim(),
+            category: ['study', 'work', 'personal', 'project'].includes(t.category) ? t.category : 'study',
+            priority: ['low', 'medium', 'high'].includes(t.priority) ? t.priority : 'medium',
+            dueDate: t.dueDate || '',
+            image: t.image || null,
+            status: columnOrder.includes(t.status) ? t.status : 'todo'
+        }))
+        .filter(t => t.title.length > 0);
+
+    try { localStorage.setItem('taskflow_tasks', JSON.stringify(tasks)); } catch(e){}
+
+    let currentLang = localStorage.getItem('taskflow_lang') || 'ua';
+    let currentTheme = localStorage.getItem('taskflow_theme') || 'dark';
+    let deleteTaskId = null;
+    let currentImageData = null;
+    let isViewFullscreen = false;
+
+    const translations = {
+        ua: {
+            subtitle: 'Канбан-дошка нового покоління',
+            searchPlaceholder: 'Пошук завдань...',
+            catAll: 'Усі категорії', catStudy: 'Навчання', catWork: 'Робота', catPersonal: 'Особисте', catProject: 'Проєкт',
+            prioAll: 'Усі пріоритети', prioHigh: 'Високий', prioMedium: 'Середній', prioLow: 'Низький',
+            btnCreate: 'Створити', statTotal: 'Всього', statInProgress: 'В процесі', statDone: 'Виконано', statProgress: 'Прогрес',
+            colTodo: 'До виконання', colInProgress: 'В процесі', colReview: 'На перевірці', colDone: 'Готово', emptyTask: 'Немає завдань',
+            modalCreateTitle: 'Створити завдання', modalEditTitle: 'Редагувати завдання',
+            formTitle: 'Назва завдання *', formDesc: 'Опис', formImage: 'Прикріпити зображення', formCat: 'Категорія', formPrio: 'Пріоритет', formDate: 'Дедлайн',
+            btnCancel: 'Скасувати', btnSave: 'Зберегти', confirmTitle: 'Видалення завдання', confirmMsg: 'Ви впевнені, що хочете видалити це завдання?',
+            confirmCancel: 'Скасувати', confirmDelete: 'Видалити', viewDescHeading: 'Опис завдання', viewClose: 'Закрити', noDesc: 'Опис відсутній',
+            fullScreenExpand: 'На весь екран', fullScreenNormal: 'Згорнути'
+        },
+        en: {
+            subtitle: 'Next Generation Kanban Board',
+            searchPlaceholder: 'Search tasks...',
+            catAll: 'All Categories', catStudy: 'Study', catWork: 'Work', catPersonal: 'Personal', catProject: 'Project',
+            prioAll: 'All Priorities', prioHigh: 'High', prioMedium: 'Medium', prioLow: 'Low',
+            btnCreate: 'Create', statTotal: 'Total', statInProgress: 'In Progress', statDone: 'Completed', statProgress: 'Progress',
+            colTodo: 'To Do', colInProgress: 'In Progress', colReview: 'In Review', colDone: 'Done', emptyTask: 'No tasks',
+            modalCreateTitle: 'Create Task', modalEditTitle: 'Edit Task',
+            formTitle: 'Task Title *', formDesc: 'Description', formImage: 'Attach Image', formCat: 'Category', formPrio: 'Priority', formDate: 'Due Date',
+            btnCancel: 'Cancel', btnSave: 'Save', confirmTitle: 'Delete Task', confirmMsg: 'Are you sure you want to delete this task?',
+            confirmCancel: 'Cancel', confirmDelete: 'Delete', viewDescHeading: 'Task Description', viewClose: 'Close', noDesc: 'No description provided',
+            fullScreenExpand: 'Full screen', fullScreenNormal: 'Minimize'
+        }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        setupGlobalListeners();
+        applyTheme(currentTheme);
+        applyLanguage(currentLang);
+        renderBoard();
+    });
+
+    function setupGlobalListeners() {
+        document.getElementById('btn-theme')?.addEventListener('click', () => {
+            currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            try { localStorage.setItem('taskflow_theme', currentTheme); } catch(e){}
+            applyTheme(currentTheme);
+        });
+
+        document.getElementById('btn-lang')?.addEventListener('click', () => {
+            currentLang = currentLang === 'ua' ? 'en' : 'ua';
+            try { localStorage.setItem('taskflow_lang', currentLang); } catch(e){}
+            applyLanguage(currentLang);
+            renderBoard();
+        });
+
+        document.getElementById('search-input')?.addEventListener('input', renderBoard);
+        document.getElementById('filter-category')?.addEventListener('change', renderBoard);
+        document.getElementById('filter-priority')?.addEventListener('change', renderBoard);
+
+        document.getElementById('task-image-input')?.addEventListener('change', handleImageSelect);
+
+        document.querySelectorAll('.kanban-column').forEach(column => {
+            column.addEventListener('dragover', e => {
+                e.preventDefault();
+                column.classList.add('ring-2', 'ring-blue-500/50', 'bg-blue-50/20');
+            });
+            column.addEventListener('dragleave', () => {
+                column.classList.remove('ring-2', 'ring-blue-500/50', 'bg-blue-50/20');
+            });
+            column.addEventListener('drop', e => {
+                e.preventDefault();
+                column.classList.remove('ring-2', 'ring-blue-500/50', 'bg-blue-50/20');
+                const taskId = e.dataTransfer.getData('text/plain');
+                const newStatus = column.dataset.status;
+
+                const task = tasks.find(t => t.id === taskId);
+                if (task && task.status !== newStatus) {
+                    task.status = newStatus;
+                    saveTasks();
+                    renderBoard();
+                }
+            });
+        });
+    }
+
+    function saveTaskFromModal() {
+        try {
+            const titleInput = document.getElementById('task-title-input');
+            const title = titleInput ? titleInput.value.trim() : '';
+            const errorMsg = document.getElementById('title-error-msg');
+
+            if (!title) {
+                if (titleInput) {
+                    titleInput.classList.add('border-red-500', 'ring-2', 'ring-red-500');
+                    titleInput.focus();
+                }
+                if (errorMsg) errorMsg.classList.remove('hidden');
+                return;
+            }
+
+            if (titleInput) titleInput.classList.remove('border-red-500', 'ring-2', 'ring-red-500');
+            if (errorMsg) errorMsg.classList.add('hidden');
+
+            const taskId = document.getElementById('task-id')?.value;
+            const descVal = document.getElementById('task-desc-input')?.value.trim() || '';
+            const catVal = document.getElementById('task-category-input')?.value || 'study';
+            const prioVal = document.getElementById('task-priority-input')?.value || 'medium';
+            const dateVal = document.getElementById('task-date-input')?.value || '';
+
+            if (taskId) {
+                const index = tasks.findIndex(t => t.id === taskId);
+                if (index !== -1) {
+                    tasks[index].title = title;
+                    tasks[index].description = descVal;
+                    tasks[index].category = catVal;
+                    tasks[index].priority = prioVal;
+                    tasks[index].dueDate = dateVal;
+                    if (currentImageData !== null) tasks[index].image = currentImageData;
+                }
+            } else {
+                const newTask = {
+                    id: String(Date.now()),
+                    title: title,
+                    description: descVal,
+                    category: catVal,
+                    priority: prioVal,
+                    dueDate: dateVal,
+                    image: currentImageData,
+                    status: 'todo'
+                };
+                tasks.push(newTask);
+
+                const sInput = document.getElementById('search-input');
+                const cFilter = document.getElementById('filter-category');
+                const pFilter = document.getElementById('filter-priority');
+                if (sInput) sInput.value = '';
+                if (cFilter) cFilter.value = 'all';
+                if (pFilter) pFilter.value = 'all';
+            }
+
+            saveTasks();
+            renderBoard();
+            closeTaskModal();
+        } catch (err) {
+            console.error("Save error:", err);
+        }
+    }
+
+    function setSafeText(id, text) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    }
+
+    function applyTheme(theme) {
+        if (theme === 'dark') document.documentElement.classList.add('dark');
+        else document.documentElement.classList.remove('dark');
+    }
+
+    function applyLanguage(lang) {
+        const t = translations[lang] || translations.ua;
+
+        const langBtnText = document.getElementById('lang-btn-text');
+        if (langBtnText) {
+            if (lang === 'ua') langBtnText.innerHTML = `<span class="font-black text-blue-500">UA</span> | <span class="font-normal opacity-60">ENG</span>`;
+            else langBtnText.innerHTML = `<span class="font-normal opacity-60">UA</span> | <span class="font-black text-blue-500">ENG</span>`;
+        }
+
+        setSafeText('lang-subtitle', t.subtitle);
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) searchInput.placeholder = t.searchPlaceholder;
+
+        setSafeText('lang-cat-all', t.catAll);
+        setSafeText('lang-cat-study', t.catStudy);
+        setSafeText('lang-cat-work', t.catWork);
+        setSafeText('lang-cat-personal', t.catPersonal);
+        setSafeText('lang-cat-project', t.catProject);
+
+        setSafeText('lang-prio-all', t.prioAll);
+        setSafeText('lang-prio-high', t.prioHigh);
+        setSafeText('lang-prio-medium', t.prioMedium);
+        setSafeText('lang-prio-low', t.prioLow);
+
+        setSafeText('lang-btn-create', t.btnCreate);
+        setSafeText('lang-stat-total', t.statTotal);
+        setSafeText('lang-stat-in-progress', t.statInProgress);
+        setSafeText('lang-stat-done', t.statDone);
+        setSafeText('lang-stat-progress', t.statProgress);
+
+        setSafeText('lang-col-todo', t.colTodo);
+        setSafeText('lang-col-in-progress', t.colInProgress);
+        setSafeText('lang-col-review', t.colReview);
+        setSafeText('lang-col-done', t.colDone);
+
+        setSafeText('lang-form-title', t.formTitle);
+        setSafeText('lang-form-desc', t.formDesc);
+        setSafeText('lang-form-image', t.formImage);
+        setSafeText('lang-form-cat', t.formCat);
+        setSafeText('lang-form-prio', t.formPrio);
+        setSafeText('lang-form-date', t.formDate);
+
+        setSafeText('lang-opt-study', t.catStudy);
+        setSafeText('lang-opt-work', t.catWork);
+        setSafeText('lang-opt-personal', t.catPersonal);
+        setSafeText('lang-opt-project', t.catProject);
+
+        setSafeText('lang-opt-low', t.prioLow);
+        setSafeText('lang-opt-medium', t.prioMedium);
+        setSafeText('lang-opt-high', t.prioHigh);
+
+        setSafeText('lang-btn-cancel', t.btnCancel);
+        setSafeText('lang-btn-save', t.btnSave);
+
+        setSafeText('lang-confirm-title', t.confirmTitle);
+        setSafeText('lang-confirm-msg', t.confirmMsg);
+        setSafeText('lang-confirm-cancel', t.confirmCancel);
+        setSafeText('lang-confirm-delete', t.confirmDelete);
+
+        setSafeText('lang-view-desc-heading', t.viewDescHeading);
+        setSafeText('lang-view-close', t.viewClose);
+
+        setSafeText('lang-fullscreen-btn', isViewFullscreen ? t.fullScreenNormal : t.fullScreenExpand);
+    }
+
+    function handleImageSelect(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                currentImageData = evt.target.result;
+                const img = document.getElementById('image-preview');
+                if (img) img.src = currentImageData;
+                document.getElementById('image-preview-container')?.classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function removeSelectedImage() {
+        currentImageData = null;
+        const input = document.getElementById('task-image-input');
+        const img = document.getElementById('image-preview');
+        if (input) input.value = '';
+        if (img) img.src = '';
+        document.getElementById('image-preview-container')?.classList.add('hidden');
+    }
+
+    function moveTaskStage(taskId, direction) {
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const currentIndex = columnOrder.indexOf(task.status);
+        const newIndex = currentIndex + direction;
+
+        if (newIndex >= 0 && newIndex < columnOrder.length) {
+            task.status = columnOrder[newIndex];
+            saveTasks();
+            renderBoard();
+        }
+    }
+
+    function openTaskModal(taskId = null) {
+        const t = translations[currentLang] || translations.ua;
+        removeSelectedImage();
+
+        const titleInput = document.getElementById('task-title-input');
+        const errorMsg = document.getElementById('title-error-msg');
+        if (titleInput) titleInput.classList.remove('border-red-500', 'ring-2', 'ring-red-500');
+        if (errorMsg) errorMsg.classList.add('hidden');
+
+        if (taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return;
+
+            setSafeText('modal-title', t.modalEditTitle);
+            document.getElementById('task-id').value = task.id;
+            document.getElementById('task-title-input').value = task.title;
+            document.getElementById('task-desc-input').value = task.description;
+            document.getElementById('task-category-input').value = task.category;
+            document.getElementById('task-priority-input').value = task.priority;
+            document.getElementById('task-date-input').value = task.dueDate || '';
+
+            if (task.image) {
+                currentImageData = task.image;
+                const img = document.getElementById('image-preview');
+                if (img) img.src = task.image;
+                document.getElementById('image-preview-container')?.classList.remove('hidden');
+            }
+        } else {
+            setSafeText('modal-title', t.modalCreateTitle);
+            document.getElementById('task-form')?.reset();
+            document.getElementById('task-id').value = '';
+        }
+
+        const modal = document.getElementById('task-modal');
+        modal?.classList.remove('opacity-0', 'pointer-events-none');
+        modal?.firstElementChild?.classList.remove('scale-95');
+        modal?.firstElementChild?.classList.add('scale-100');
+    }
+
+    function closeTaskModal() {
+        const modal = document.getElementById('task-modal');
+        modal?.classList.add('opacity-0', 'pointer-events-none');
+        modal?.firstElementChild?.classList.remove('scale-100');
+        modal?.firstElementChild?.classList.add('scale-95');
+        removeSelectedImage();
+    }
+
+    function renderBoard() {
+        tasks = tasks.filter(t => t && t.title && t.title.trim() !== '' && columnOrder.includes(t.status));
+
+        const searchQuery = (document.getElementById('search-input')?.value || '').toLowerCase();
+        const categoryFilter = document.getElementById('filter-category')?.value || 'all';
+        const priorityFilter = document.getElementById('filter-priority')?.value || 'all';
+
+        const cTodo = document.getElementById('col-todo');
+        const cInProg = document.getElementById('col-in-progress');
+        const cRev = document.getElementById('col-review');
+        const cDone = document.getElementById('col-done');
+
+        if (cTodo) cTodo.innerHTML = '';
+        if (cInProg) cInProg.innerHTML = '';
+        if (cRev) cRev.innerHTML = '';
+        if (cDone) cDone.innerHTML = '';
+
+        let filteredTasks = tasks.filter(task => {
+            const matchesSearch = (task.title || '').toLowerCase().includes(searchQuery) || (task.description || '').toLowerCase().includes(searchQuery);
+            const matchesCategory = categoryFilter === 'all' || task.category === categoryFilter;
+            const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
+            return matchesSearch && matchesCategory && matchesPriority;
+        });
+
+        const counts = { todo: 0, 'in-progress': 0, review: 0, done: 0 };
+
+        filteredTasks.forEach(task => {
+            const st = task.status;
+            counts[st] = (counts[st] || 0) + 1;
+            const card = createTaskCard(task);
+
+            if (st === 'todo' && cTodo) cTodo.appendChild(card);
+            else if (st === 'in-progress' && cInProg) cInProg.appendChild(card);
+            else if (st === 'review' && cRev) cRev.appendChild(card);
+            else if (st === 'done' && cDone) cDone.appendChild(card);
+        });
+
+        columnOrder.forEach(status => {
+            const container = document.getElementById(`col-${status}`);
+            if (container && container.children.length === 0) {
+                container.innerHTML = `
+                        <div class="h-32 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-center text-slate-400 text-xs font-medium">
+                            ${translations[currentLang]?.emptyTask || 'Немає завдань'}
+                        </div>
+                    `;
+            }
+        });
+
+        setSafeText('count-todo', counts.todo);
+        setSafeText('count-in-progress', counts['in-progress']);
+        setSafeText('count-review', counts.review);
+        setSafeText('count-done', counts.done);
+
+        const total = tasks.length;
+        const doneCount = tasks.filter(t => t.status === 'done').length;
+        const inProgressCount = tasks.filter(t => t.status === 'in-progress').length;
+        const progressPercent = total === 0 ? 0 : Math.round((doneCount / total) * 100);
+
+        setSafeText('stat-total', total);
+        setSafeText('stat-in-progress', inProgressCount);
+        setSafeText('stat-done', doneCount);
+        setSafeText('stat-progress', `${progressPercent}%`);
+
+        const progressFill = document.getElementById('progress-bar-fill');
+        if (progressFill) progressFill.style.width = `${progressPercent}%`;
+    }
+
+    function createTaskCard(task) {
+        const card = document.createElement('div');
+        card.className = 'bg-white/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-200 group relative cursor-grab active:cursor-grabbing backdrop-blur-sm';
+        card.draggable = true;
+
+        card.addEventListener('dragstart', e => {
+            e.dataTransfer.setData('text/plain', task.id);
+            card.classList.add('opacity-50', 'scale-95');
+        });
+
+        card.addEventListener('dragend', () => {
+            card.classList.remove('opacity-50', 'scale-95');
+        });
+
+        const safePrio = (task.priority || 'medium').toLowerCase();
+        const safeCat = (task.category || 'study').toLowerCase();
+        const safeStatus = task.status || 'todo';
+
+        const prioColors = {
+            high: 'bg-red-100 text-red-600 dark:bg-red-950/60 dark:text-red-400 border-red-200 dark:border-red-900',
+            medium: 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 border-amber-200 dark:border-amber-900',
+            low: 'bg-blue-100 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 border-blue-200 dark:border-blue-900'
+        };
+
+        const t = translations[currentLang] || translations.ua;
+        const prioText = t[`prio${safePrio.charAt(0).toUpperCase() + safePrio.slice(1)}`] || safePrio;
+        const catText = t[`cat${safeCat.charAt(0).toUpperCase() + safeCat.slice(1)}`] || safeCat;
+
+        let dateBadge = '';
+        if (task.dueDate) {
+            const today = new Date().toISOString().split('T')[0];
+            const isOverdue = task.dueDate < today && safeStatus !== 'done';
+            const isToday = task.dueDate === today && safeStatus !== 'done';
+
+            let dateColor = 'text-slate-400 bg-slate-100 dark:bg-slate-900';
+            if (isOverdue) dateColor = 'text-red-500 bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-900';
+            else if (isToday) dateColor = 'text-amber-500 bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-900';
+
+            dateBadge = `
+                    <div class="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-lg border ${dateColor}">
+                        <i class="far fa-calendar"></i>
+                        <span>${escapeHtml(task.dueDate)}</span>
+                    </div>
+                `;
+        }
+
+        const currentColumnIndex = columnOrder.indexOf(safeStatus);
+        const canMoveLeft = currentColumnIndex > 0;
+        const canMoveRight = currentColumnIndex < columnOrder.length - 1 && currentColumnIndex !== -1;
+
+        card.innerHTML = `
+                ${task.image ? `
+                    <div class="mb-3 rounded-xl overflow-hidden max-h-36 bg-slate-100 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
+                        <img src="${task.image}" alt="Card image" class="w-full h-full object-cover">
+                    </div>
+                ` : ''}
+
+                <div class="flex items-center justify-between gap-2 mb-2">
+                    <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-lg border ${prioColors[safePrio] || prioColors.medium}">
+                        ${prioText}
+                    </span>
+                    <span class="text-[11px] font-medium text-slate-400">
+                        #${catText}
+                    </span>
+                </div>
+
+                <h3 class="font-bold text-sm mb-1 text-slate-800 dark:text-slate-100 line-clamp-2">${escapeHtml(task.title || '')}</h3>
+
+                ${task.description ? `<p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-3 leading-relaxed">${escapeHtml(task.description)}</p>` : ''}
+
+                <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700/50 mt-2">
+                    <div class="flex items-center gap-1">
+                        <button type="button" onclick="moveTaskStage('${task.id}', -1)" ${!canMoveLeft ? 'disabled class="opacity-20 cursor-not-allowed text-slate-400 p-1.5"' : 'class="p-1.5 text-slate-500 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"'} title="Перемістити ліворуч">
+                            <i class="fas fa-chevron-left text-xs"></i>
+                        </button>
+                        <button type="button" onclick="moveTaskStage('${task.id}', 1)" ${!canMoveRight ? 'disabled class="opacity-20 cursor-not-allowed text-slate-400 p-1.5"' : 'class="p-1.5 text-slate-500 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"'} title="Перемістити праворуч">
+                            <i class="fas fa-chevron-right text-xs"></i>
+                        </button>
+                    </div>
+
+                    ${dateBadge}
+
+                    <div class="flex items-center gap-1">
+                        <button type="button" onclick="openViewModal('${task.id}')" class="p-1.5 text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition" title="Деталі">
+                            <i class="fas fa-eye text-xs"></i>
+                        </button>
+                        <button type="button" onclick="openTaskModal('${task.id}')" class="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition" title="Редагувати">
+                            <i class="fas fa-pen text-xs"></i>
+                        </button>
+                        <button type="button" onclick="openConfirmModal('${task.id}')" class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition" title="Видалити">
+                            <i class="fas fa-trash text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+
+        return card;
+    }
+
+    // РОЗГОРТАННЯ / ЗГОРТАННЯ МОДАЛЬНОГО ВІКНА НА ВЕСЬ ЕКРАН
+    function toggleViewFullscreen() {
+        const content = document.getElementById('view-modal-content');
+        const icon = document.getElementById('fullscreen-icon');
+        const desc = document.getElementById('view-desc');
+        const t = translations[currentLang] || translations.ua;
+
+        isViewFullscreen = !isViewFullscreen;
+
+        if (isViewFullscreen) {
+            content?.classList.remove('max-w-2xl', 'max-h-[90vh]');
+            content?.classList.add('max-w-[96vw]', 'w-full', 'h-[92vh]', 'max-h-[92vh]');
+            desc?.classList.remove('max-h-80');
+            desc?.classList.add('flex-1', 'max-h-none');
+            if (icon) icon.className = 'fas fa-compress';
+            setSafeText('lang-fullscreen-btn', t.fullScreenNormal);
+        } else {
+            content?.classList.remove('max-w-[96vw]', 'w-full', 'h-[92vh]', 'max-h-[92vh]');
+            content?.classList.add('max-w-2xl', 'max-h-[90vh]');
+            desc?.classList.add('max-h-80');
+            desc?.classList.remove('flex-1', 'max-h-none');
+            if (icon) icon.className = 'fas fa-expand';
+            setSafeText('lang-fullscreen-btn', t.fullScreenExpand);
+        }
+    }
+
+    function openViewModal(taskId) {
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const t = translations[currentLang] || translations.ua;
+
+        setSafeText('view-title', task.title);
+        setSafeText('view-desc', task.description || t.noDesc);
+
+        const imgContainer = document.getElementById('view-image-container');
+        const img = document.getElementById('view-image');
+        if (task.image && imgContainer && img) {
+            img.src = task.image;
+            imgContainer.classList.remove('hidden');
+        } else if (imgContainer) {
+            imgContainer.classList.add('hidden');
+        }
+
+        const prioColors = {
+            high: 'bg-red-100 text-red-600 dark:bg-red-950/60 dark:text-red-400',
+            medium: 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400',
+            low: 'bg-blue-100 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400'
+        };
+
+        const safePrio = task.priority || 'medium';
+        const safeCat = task.category || 'study';
+        const safeStatus = task.status || 'todo';
+
+        const prioText = t[`prio${safePrio.charAt(0).toUpperCase() + safePrio.slice(1)}`];
+        const catText = t[`cat${safeCat.charAt(0).toUpperCase() + safeCat.slice(1)}`];
+        const statusText = t[`col${safeStatus.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('')}`];
+
+        const viewBadges = document.getElementById('view-badges');
+        if (viewBadges) {
+            viewBadges.innerHTML = `
+                    <span class="text-xs font-bold px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">${statusText}</span>
+                    <span class="text-xs font-bold px-2.5 py-1 rounded-xl ${prioColors[safePrio]}">${prioText}</span>
+                    <span class="text-xs font-semibold px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">#${catText}</span>
+                `;
+        }
+
+        setSafeText('view-date', task.dueDate ? `${t.formDate}: ${task.dueDate}` : '');
+
+        const modal = document.getElementById('view-modal');
+        modal?.classList.remove('opacity-0', 'pointer-events-none');
+        modal?.firstElementChild?.classList.remove('scale-95');
+        modal?.firstElementChild?.classList.add('scale-100');
+    }
+
+    function closeViewModal() {
+        // Скидаємо режим "На весь екран" при закритті
+        if (isViewFullscreen) {
+            toggleViewFullscreen();
+        }
+
+        const modal = document.getElementById('view-modal');
+        modal?.classList.add('opacity-0', 'pointer-events-none');
+        modal?.firstElementChild?.classList.remove('scale-100');
+        modal?.firstElementChild?.classList.add('scale-95');
+    }
+
+    function openConfirmModal(taskId) {
+        deleteTaskId = taskId;
+        const modal = document.getElementById('confirm-modal');
+        modal?.classList.remove('opacity-0', 'pointer-events-none');
+        modal?.firstElementChild?.classList.remove('scale-95');
+        modal?.firstElementChild?.classList.add('scale-100');
+    }
+
+    function closeConfirmModal() {
+        deleteTaskId = null;
+        const modal = document.getElementById('confirm-modal');
+        modal?.classList.add('opacity-0', 'pointer-events-none');
+        modal?.firstElementChild?.classList.remove('scale-100');
+        modal?.firstElementChild?.classList.add('scale-95');
+    }
+
+    function executeDeleteTask() {
+        if (deleteTaskId) {
+            tasks = tasks.filter(t => t.id !== deleteTaskId);
+            saveTasks();
+            renderBoard();
+            closeConfirmModal();
+        }
+    }
+
+    function saveTasks() {
+        try {
+            localStorage.setItem('taskflow_tasks', JSON.stringify(tasks));
+        } catch(e) {
+            console.warn("LocalStorage error:", e);
+        }
+    }
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+</script>
+</body>
+</html>
